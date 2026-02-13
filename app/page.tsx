@@ -8,10 +8,16 @@ export default function Home() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* ✅ Convert Image to Base64 */
+  /* ✅ Upload + Convert Image to Base64 */
   const handleFileChange = (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    /* ✅ Limit Image Size (Important for Vercel) */
+    if (file.size > 2 * 1024 * 1024) {
+      alert("⚠️ Please upload an image below 2MB (Screenshots may fail)");
+      return;
+    }
 
     setFileName(file.name);
 
@@ -25,7 +31,7 @@ export default function Home() {
   /* ✅ Identify Flower */
   const identifyFlower = async () => {
     if (!image) {
-      alert("Please upload a flower image!");
+      alert("Please upload a flower image first!");
       return;
     }
 
@@ -45,13 +51,13 @@ export default function Home() {
 
       const data = await res.json();
 
-      if (data.error) {
-        setResult("❌ Error: " + data.error);
+      if (!res.ok) {
+        setResult("❌ API Error: " + (data.error || "Unknown issue"));
       } else {
         setResult(data.flowerResult);
       }
     } catch (err) {
-      setResult("❌ Flower identification failed. Try again.");
+      setResult("❌ Flower identification failed. Please try again.");
     }
 
     setLoading(false);
@@ -103,7 +109,8 @@ export default function Home() {
         {/* Identify Button */}
         <button
           onClick={identifyFlower}
-          className="w-full py-3 rounded-full bg-green-600 text-white font-semibold hover:bg-green-700 transition"
+          disabled={loading}
+          className="w-full py-3 rounded-full bg-green-600 text-white font-semibold hover:bg-green-700 transition disabled:opacity-60"
         >
           {loading ? "🌼 Identifying..." : "📷 Identify Flower"}
         </button>
