@@ -13,6 +13,7 @@ export async function POST(req: Request) {
   try {
     const { imageBase64 } = await req.json();
 
+    /* ✅ Validate Image */
     if (!imageBase64) {
       return NextResponse.json(
         { error: "No image provided" },
@@ -20,14 +21,23 @@ export async function POST(req: Request) {
       );
     }
 
-    /* ✅ Upload Image to Cloudinary */
-    const uploadResult = await cloudinary.uploader.upload(imageBase64, {
-      folder: "trova-fiori",
-    });
+    /* ✅ FIX 1: Remove Base64 Prefix */
+    const cleanBase64 = imageBase64.replace(
+      /^data:image\/\w+;base64,/,
+      ""
+    );
+
+    /* ✅ FIX 2: Upload Correctly to Cloudinary */
+    const uploadResult = await cloudinary.uploader.upload(
+      "data:image/jpeg;base64," + cleanBase64,
+      {
+        folder: "trova-fiori",
+      }
+    );
 
     const imageUrl = uploadResult.secure_url;
 
-    /* ✅ Call Grok Vision */
+    /* ✅ FIX 3: Call Correct Grok Vision Model */
     const grokResponse = await fetch(
       "https://api.x.ai/v1/chat/completions",
       {
@@ -37,7 +47,7 @@ export async function POST(req: Request) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "grok-vision-beta",
+          model: "grok-2-vision-1212", // ✅ Updated Model
           messages: [
             {
               role: "user",
@@ -47,7 +57,8 @@ export async function POST(req: Request) {
                   text: `
 You are a flower expert botanist.
 Identify the flower in this image.
-Return response in this format:
+
+Return ONLY in this format:
 
 Flower Name:
 Scientific Name:
@@ -67,24 +78,31 @@ Short Description:
 
     const data = await grokResponse.json();
 
+    /* ✅ Handle Grok Failure */
     if (!data.choices) {
+      console.error("Grok API Failed Response:", data);
+
       return NextResponse.json(
-        { error: "Grok API failed", details: data },
+        {
+          error: "Grok API failed",
+          details: data,
+        },
         { status: 500 }
       );
     }
 
+    /* ✅ Success Response */
     return NextResponse.json({
       uploadedImage: imageUrl,
       flowerResult: data.choices[0].message.content,
     });
   } catch (err: any) {
-    console.error("Identify API Error:", err);
+    console.error("FULL Identify API Error:", err);
 
     return NextResponse.json(
       {
         error: "Flower identification failed",
-        message: err.message,
+        details: err.message,
       },
       { status: 500 }
     );
